@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Solar Utility Agent — Find the best hour for solar power</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>
+      <span class="sun-icon">☀️</span>
+      <span class="title-text">Solar Utility Agent</span>
+    </h1>
+    <p class="tagline">Find the best hour to use solar power in Seri Iskandar, Perak.</p>
+    <p class="tech-note">Open-Meteo forecast · logistic-regression model · utility-based decision</p>
+    <p class="tech-note">Data trained for Seri Iskandar, Perak</p>
+  </header>
+
+  <main>
+    <!-- ─── Primer / glossary (collapsible) ─────────── -->
+    <details class="primer" open>
+      <summary>
+        <span class="summary-icon">💡</span>
+        <span>New here? What does this tool do?</span>
+        <span class="summary-chevron">▾</span>
+      </summary>
+      <div class="primer-body">
+        <p>This tool reads the weather forecast for the next few days and tells you <strong>the best time to run solar-powered equipment</strong> — a pump, a charger, a battery, or anything that needs sunshine.</p>
+        <ol class="primer-steps">
+          <li><strong>Pick a location</strong> (or keep the default) and how many days ahead to look.</li>
+          <li><strong>Click "Decide"</strong> — we fetch the forecast and run a small machine-learning model.</li>
+          <li><strong>Read the big answer</strong> at the top: <em>run now</em>, <em>wait for a better hour</em>, or <em>skip</em>.</li>
+        </ol>
+        <p class="glossary-title">Quick glossary:</p>
+        <dl class="glossary">
+          <dt><span class="ico">☀️</span>GHI (W/m²)</dt>
+          <dd><strong>Global Horizontal Irradiance</strong> — a measure of how strong the sunlight is, in Watts per square metre. <strong>~0</strong> = night or heavy cloud. <strong>~1000</strong> = full direct sun. Higher is better.</dd>
+          <dt><span class="ico">🌧️</span>Rain chance</dt>
+          <dd>The <strong>probability of rain</strong> in that hour, as a percentage (0–100%).</dd>
+          <dt><span class="ico">⚡</span>Utility score (0–1)</dt>
+          <dd>A single number for how <strong>worthwhile that hour is</strong>. Closer to 1 = better. Above the <span class="inline-tag inline-good">GOOD</span> line is ideal; between <span class="inline-tag inline-floor">FLOOR</span> and GOOD is usable; below FLOOR is not worth running.</dd>
+          <dt><span class="ico">🎯</span>Verdict</dt>
+          <dd><span class="badge badge-good">GOOD</span> bright sun · <span class="badge badge-marginal">MARGINAL</span> usable but not great · <span class="badge badge-no">NO</span> too cloudy or dark.</dd>
+          <dt><span class="ico">📶</span>Confidence</dt>
+          <dd>How <strong>sure the model is</strong> about its verdict. <em>High</em> = very sure · <em>Medium</em> = fairly sure · <em>Low</em> = a toss-up.</dd>
+        </dl>
+      </div>
+    </details>
+
+    <!-- ─── Controls ─────────────────────────────────── -->
+    <section class="controls">
+      <div class="field field-location">
+        <label for="locationPreset">📍 Location</label>
+        <select id="locationPreset" class="select">
+          <option value="seri_iskandar">Seri Iskandar, Perak 🇲🇾</option>
+          <option value="kuala_lumpur">Kuala Lumpur 🇲🇾</option>
+          <option value="penang">George Town, Penang 🇲🇾</option>
+          <option value="johor_bahru">Johor Bahru 🇲🇾</option>
+          <option value="custom">Custom coordinates…</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="lat">Latitude <span class="info" tabindex="0" data-tip="How far north of the equator (degrees). Seri Iskandar is at 4.36°N.">i</span></label>
+        <input id="lat" type="number" step="0.0001" value="4.3596" />
+      </div>
+      <div class="field">
+        <label for="lon">Longitude <span class="info" tabindex="0" data-tip="How far east of the Prime Meridian (degrees). Seri Iskandar is at 100.98°E.">i</span></label>
+        <input id="lon" type="number" step="0.0001" value="100.9761" />
+      </div>
+      <div class="field field-days">
+        <label for="forecastDays">Days ahead <span class="info" tabindex="0" data-tip="How many days to look ahead. 1 = today only, 16 = the maximum forecast range.">i</span></label>
+        <input id="forecastDays" type="number" step="1" min="1" max="16" value="7" />
+      </div>
+      <button id="analyzeBtn" class="btn">
+        <span class="btn-icon">⚡</span>
+        <span>Decide</span>
+      </button>
+    </section>
+
+    <p id="status" class="status"></p>
+
+    <div id="modelWarning" class="banner hidden">
+      ⚠️ <code>solar_model.pkl</code> not found — running on the fallback heuristic.
+      Run <code>train_model.ipynb</code> and restart the server to use the learned model.
+    </div>
+
+    <section id="results" class="results hidden">
+      <div id="decisionCard" class="decision-card"></div>
+      <div id="actionUtilities" class="action-utilities"></div>
+      <div id="probBars" class="prob-panel"></div>
+      <div id="summaryGrid" class="summary-grid"></div>
+
+      <div class="chart-wrap">
+        <canvas id="scoreChart"></canvas>
+      </div>
+
+      <section class="hourly-section">
+        <div class="hourly-header">
+          <h2><span class="section-icon">📋</span> Hour-by-hour forecast</h2>
+          <label class="filter">
+            <input id="fromNow" type="checkbox" checked />
+            <span>Hide past hours</span>
+          </label>
+        </div>
+        <div class="table-wrap">
+          <table id="hourlyTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Sunlight <span class="info info-down" tabindex="0" data-tip="GHI in W/m² — how bright the sun is at that hour.">i</span></th>
+                <th>Rain % <span class="info info-down" tabindex="0" data-tip="Chance of rain in that hour (0–100%).">i</span></th>
+                <th>Utility <span class="info info-down" tabindex="0" data-tip="0–1 score. Higher = more worthwhile hour to run.">i</span></th>
+                <th>Verdict <span class="info info-down" tabindex="0" data-tip="GOOD = bright · MARGINAL = usable · NO = don't bother.">i</span></th>
+                <th>Confidence <span class="info info-down" tabindex="0" data-tip="How sure the model is about this hour's verdict.">i</span></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    <p><strong>How it works:</strong> we pull the hourly weather forecast from
+      <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>, then a small
+      logistic-regression model predicts three probabilities for each hour —
+      <span class="badge badge-good">GOOD</span>,
+      <span class="badge badge-marginal">MARGINAL</span>,
+      <span class="badge badge-no">NO</span>.
+      Those combine into a <strong>utility score</strong> (0–1). The tool then compares three options —
+      <em>run now</em>, <em>wait for a future hour</em>, or <em>skip</em> — and picks whichever scores highest.</p>
+    <p><em>This is a simple forecast-based awareness tool. It is not a measurement, savings guarantee, or engineering advice.</em></p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

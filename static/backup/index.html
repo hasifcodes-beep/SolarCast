@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Solar Utility Agent</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>☀️ Solar Utility Agent</h1>
+    <p>Learned logistic-regression classifier · utility-based action selection · Open-Meteo</p>
+  </header>
+
+  <main>
+    <section class="controls">
+      <div class="field">
+        <label for="lat">Latitude</label>
+        <input id="lat" type="number" step="0.0001" value="4.3596" />
+      </div>
+      <div class="field">
+        <label for="lon">Longitude</label>
+        <input id="lon" type="number" step="0.0001" value="100.9761" />
+      </div>
+      <div class="field">
+        <label for="forecastDays">Forecast Days</label>
+        <input id="forecastDays" type="number" step="1" min="1" max="16" value="7" />
+      </div>
+      <button id="analyzeBtn" class="btn">Decide</button>
+    </section>
+
+    <p id="status" class="status"></p>
+
+    <div id="modelWarning" class="banner hidden">
+      ⚠️ <code>solar_model.pkl</code> not found — running on the fallback heuristic.
+      Run <code>train_model.ipynb</code> and restart the server to use the learned model.
+    </div>
+
+    <section id="results" class="results hidden">
+
+      <!-- Decision card (confidence pill is injected here) -->
+      <div id="decisionCard" class="decision-card"></div>
+
+      <!-- Action utilities -->
+      <div id="actionUtilities" class="action-utilities"></div>
+
+      <!-- NEW: probability bars for the chosen hour -->
+      <div id="probBars" class="prob-panel"></div>
+
+      <!-- Summary -->
+      <div id="summaryGrid" class="summary-grid"></div>
+
+      <!-- Chart -->
+      <div class="chart-wrap">
+        <canvas id="scoreChart"></canvas>
+      </div>
+
+      <!-- Hourly table (now has a Confidence column) -->
+      <section class="hourly-section">
+        <div class="hourly-header">
+          <h2>Hourly forecast</h2>
+          <label class="filter">
+            <input id="fromNow" type="checkbox" checked />
+            <span>From now</span>
+          </label>
+        </div>
+        <div class="table-wrap">
+          <table id="hourlyTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>GHI (W/m²)</th>
+                <th>Rain (%)</th>
+                <th>Utility</th>
+                <th>Verdict</th>
+                <th>Confidence</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    Data: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> ·
+    utility(h) = 1.0·P(GOOD) + 0.5·P(MARGINAL) + 0.0·P(NO) ·
+    action = argmax{ run_now, wait_until_best, skip } over hours above the learned FLOOR.<br />
+    <em>This is a simple forecast-based awareness tool. It is not a measurement,
+    savings guarantee, or engineering advice.</em>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
