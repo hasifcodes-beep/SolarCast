@@ -70,7 +70,7 @@
       latitude: parseFloat(els.lat.value),
       longitude: parseFloat(els.lon.value),
       forecast_days: parseInt(els.forecastDays.value, 10),
-      mock_now: mockVal ? mockVal + ":00" : null,
+      mock_now: mockVal || null,
     };
     if (!Number.isFinite(body.latitude) ||
         !Number.isFinite(body.longitude) ||
@@ -125,9 +125,13 @@
   function renderDecision(data) {
     const d = data.decision;
     const loc = data.location || {};
+    const nowRow = data.hourly[data.now_index];
+    const nowLine = nowRow
+      ? `🕒 Now: ${fmtTime(nowRow.time)}${data.now_is_mock ? " (test time)" : ""}`
+      : "";
     const locLine = loc.latitude != null
-      ? `📍 ${state.locationLabel} · ${fmtNum(loc.latitude, 4)}°, ${fmtNum(loc.longitude, 4)}°`
-      : `📍 ${state.locationLabel}`;
+      ? `📍 ${state.locationLabel} · ${fmtNum(loc.latitude, 4)}°, ${fmtNum(loc.longitude, 4)}° · ${nowLine}`
+      : `📍 ${state.locationLabel} · ${nowLine}`;
 
     const pill = `<span class="pill ${pillClass(d.confidence_label)}">` +
                  `${d.confidence_label} confidence · ${fmtPct(d.confidence, 0)}</span>`;
@@ -311,9 +315,19 @@
                  backgroundColor: "transparent", font: { size: 10, weight: "600" } },
       },
     };
+    const nowRow = data.hourly[data.now_index];
+    if (nowRow) {
+      annotations.now = {
+        type: "line", scaleID: "x", value: data.now_index,
+        borderColor: "rgba(125, 211, 252, 0.9)", borderWidth: 2,
+        label: { display: true, content: "now", position: "start",
+                 color: "#7dd3fc", backgroundColor: "rgba(125, 211, 252, 0.15)",
+                 font: { size: 11, weight: "600" } },
+      };
+    }
     if (chosenLabel) {
       annotations.chosen = {
-        type: "line", scaleID: "x", value: chosenLabel,
+        type: "line", scaleID: "x", value: chosen,
         borderColor: "rgba(251, 146, 60, 0.9)", borderWidth: 2,
         label: { display: true, content: "★ chosen", position: "end",
                  color: "#fdba74", backgroundColor: "rgba(251, 146, 60, 0.18)",
@@ -456,6 +470,7 @@
       if (e.key === "Enter") { e.preventDefault(); analyze(); }
     });
   });
+  els.mockNow.addEventListener("change", analyze);
   els.fromNow.addEventListener("change", () => {
     if (state.data) renderTable(state.data);
   });

@@ -5,7 +5,7 @@ import httpx
 import joblib
 import numpy as np
 import polars as pl
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,6 +31,9 @@ except Exception as e:
 FALLBACK_FLOOR, FALLBACK_GOOD = 0.34, 0.61
 CANONICAL = ["GOOD", "MARGINAL", "NO"]
 
+# Decision horizon: how many hours after "now" the agent may wait for a better hour.
+LOOKAHEAD_HOURS = 24
+
 app = FastAPI(title="Solar Utility Agent")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["*"], allow_headers=["*"])
@@ -41,7 +44,7 @@ class Req(BaseModel):
     latitude: float
     longitude: float
     forecast_days: int = 7
-    mock_now: str | None = None  # Optional mock timestamp for UI testing
+    mock_now: str | None = None  # Optional simulated "now" (local time at the location)
 
 
 def _fallback_proba(ghi, rain):
@@ -58,6 +61,25 @@ def _conf_label(c: float) -> str:
     if c >= 0.80: return "High"
     if c >= 0.55: return "Medium"
     return "Low"
+
+
+def _resolve_now(mock_now: str | None, offset: int) -> datetime:
+    """Return a naive datetime in the location's local time.
+
+    If mock_now is given it must be an ISO string like 2026-11-24T00:39 or
+    2026-11-24T00:39:00. Invalid values raise a 422 instead of silently
+    falling back to the real clock.
+    """
+    if mock_now:
+        try:
+            clean = mock_now.replace("Z", "").strip()[:19]  # YYYY-MM-DDTHH:MM[:SS]
+            now = datetime.fromisoformat(clean)
+            log.info("mock_now applied: %s", now)
+            return now
+        except Exception as e:
+            log.warning("Invalid mock_now %r: %s", mock_now, e)
+            raise HTTPException(status_code=422, detail=f"Invalid mock_now '{mock_now}': {e}")
+    return (datetime.now(timezone.utc) + timedelta(seconds=offset)).replace(tzinfo=None)
 
 
 @app.post("/api/analyze")
@@ -124,13 +146,9 @@ async def analyze(req: Req):
     ]).with_row_index("index")
     rows = df.to_dicts()
 
-    # 3. "Now" index (Supports UI mock_now override)
+    # 3. "Now" index (supports UI mock_now override; invalid values -> 422)
     offset = int(data.get("utc_offset_seconds", 0))
-    if req.mock_now:
-        now = datetime.fromisoformat(req.mock_now)
-    else:
-        now = (datetime.now(timezone.utc)
-               + timedelta(seconds=offset)).replace(tzinfo=None)
+    now = _resolve_now(req.mock_now, offset)
 
     now_idx = next(
         (i for i, t in enumerate(data["hourly"]["time"])
@@ -138,10 +156,15 @@ async def analyze(req: Req):
         len(rows) - 1,
     )
 
-    # 4. Utility argmax with LEARNED floor
+    # 4. Utility argmax within the lookahead window, with LEARNED floor
+    #    and earliest-peak tie-breaker
+    end_idx = min(now_idx + LOOKAHEAD_HOURS, len(rows) - 1)
+
     run_u = rows[now_idx]["score"] if rows[now_idx]["score"] >= floor else 0.0
-    future = [(r["score"], i) for i, r in enumerate(rows)
-              if i > now_idx and r["score"] >= floor]
+    future = [(rows[i]["score"], i) for i in range(now_idx + 1, end_idx + 1)
+              if rows[i]["score"] >= floor]
+
+    # Maximize score; break ties by selecting the EARLIEST hour (-i)
     fut_u, fut_i = max(future, key=lambda x: (x[0], -x[1]), default=(0.0, None))
 
     if run_u > 0 and run_u >= fut_u:
@@ -164,6 +187,9 @@ async def analyze(req: Req):
     return {
         "location":          req.model_dump(),
         "now_index":         now_idx,
+        "now_used":          rows[now_idx]["time"],
+        "now_is_mock":       bool(req.mock_now),
+        "lookahead_hours":   LOOKAHEAD_HOURS,
         "utc_offset_seconds": offset,
         "model_loaded":      model_loaded,
         "summary":           summary,
