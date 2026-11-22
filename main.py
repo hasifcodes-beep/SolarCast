@@ -13,7 +13,6 @@ from pydantic import BaseModel
 
 # uvicorn main:app --reload
 
-
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("solar")
 
@@ -42,11 +41,11 @@ class Req(BaseModel):
     latitude: float
     longitude: float
     forecast_days: int = 7
+    mock_now: str | None = None  # Optional mock timestamp for UI testing
 
 
 def _fallback_proba(ghi, rain):
-    """Crude pseudo-probabilities, only if solar_model.pkl is missing.
-    Flagged to the UI via model_loaded=False."""
+    """Crude pseudo-probabilities, only if solar_model.pkl is missing."""
     base = np.clip(ghi / 1000.0, 0, 1) * (1 - 0.2 * rain / 100.0)
     p_good = np.clip(base, 0, 1)
     p_marg = np.clip(1 - np.abs(base - 0.5) * 2, 0, 1) * 0.5
@@ -118,17 +117,21 @@ async def analyze(req: Req):
         pl.Series("p_good", p_good),
         pl.Series("p_marginal", p_marg),
         pl.Series("p_no", p_no),
-        pl.Series("score", utility),          # "score" = utility (kept key for chart/table)
+        pl.Series("score", utility),
         pl.Series("verdict", verdict),
         pl.Series("confidence", confidence),
         pl.Series("confidence_label", conf_labels),
     ]).with_row_index("index")
     rows = df.to_dicts()
 
-    # 3. "Now" index
+    # 3. "Now" index (Supports UI mock_now override)
     offset = int(data.get("utc_offset_seconds", 0))
-    now = (datetime.now(timezone.utc)
-           + timedelta(seconds=offset)).replace(tzinfo=None)
+    if req.mock_now:
+        now = datetime.fromisoformat(req.mock_now)
+    else:
+        now = (datetime.now(timezone.utc)
+               + timedelta(seconds=offset)).replace(tzinfo=None)
+
     now_idx = next(
         (i for i, t in enumerate(data["hourly"]["time"])
          if datetime.fromisoformat(t) >= now),
@@ -139,9 +142,9 @@ async def analyze(req: Req):
     run_u = rows[now_idx]["score"] if rows[now_idx]["score"] >= floor else 0.0
     future = [(r["score"], i) for i, r in enumerate(rows)
               if i > now_idx and r["score"] >= floor]
-    fut_u, fut_i = max(future, default=(0.0, None))
+    fut_u, fut_i = max(future, key=lambda x: (x[0], -x[1]), default=(0.0, None))
 
-    if run_u > 0 and run_u >= fut_u:          # ties go to run_now
+    if run_u > 0 and run_u >= fut_u:
         action, util, h_idx = "run_now", run_u, now_idx
     elif fut_u > 0:
         action, util, h_idx = "wait_until_best", fut_u, fut_i
