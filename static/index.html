@@ -34,21 +34,21 @@
         <p>This tool reads the weather forecast for the next few days and tells you <strong>the best time to run solar-powered equipment</strong> — a pump, a charger, a battery, or anything that needs sunshine.</p>
         <ol class="primer-steps">
           <li><strong>Pick a location</strong> (or keep the default) and how many days ahead to look.</li>
-          <li><strong>Click "Decide"</strong> — we fetch the forecast and run a small machine-learning model.</li>
+          <li><strong>Click "Decide"</strong> — we fetch the forecast and run a small machine-learning model[cite: 1].</li>
           <li><strong>Read the big answer</strong> at the top: <em>run now</em>, <em>wait for a better hour</em>, or <em>skip</em>.</li>
         </ol>
         <p class="glossary-title">Quick glossary:</p>
         <dl class="glossary">
           <dt><span class="ico">☀️</span>GHI (W/m²)</dt>
-          <dd><strong>Global Horizontal Irradiance</strong> — a measure of how strong the sunlight is, in Watts per square metre. <strong>~0</strong> = night or heavy cloud. <strong>~1000</strong> = full direct sun. Higher is better.</dd>
+          <dd><strong>Global Horizontal Irradiance</strong> — a measure of how strong the sunlight is, in Watts per square metre[cite: 6]. <strong>~0</strong> = night or heavy cloud. <strong>~1000</strong> = full direct sun. Higher is better.</dd>
           <dt><span class="ico">🌧️</span>Rain chance</dt>
-          <dd>The <strong>probability of rain</strong> in that hour, as a percentage (0–100%).</dd>
+          <dd>The <strong>probability of rain</strong> in that hour, as a percentage (0–100%)[cite: 6].</dd>
           <dt><span class="ico">⚡</span>Utility score (0–1)</dt>
-          <dd>A single number for how <strong>worthwhile that hour is</strong>. Closer to 1 = better. Above the <span class="inline-tag inline-good">GOOD</span> line is ideal; between <span class="inline-tag inline-floor">FLOOR</span> and GOOD is usable; below FLOOR is not worth running.</dd>
+          <dd>A single number for how <strong>worthwhile that hour is</strong>[cite: 6]. Closer to 1 = better. Above the <span class="inline-tag inline-good">GOOD</span> line is ideal; between <span class="inline-tag inline-floor">FLOOR</span> and GOOD is usable; below FLOOR is not worth running.</dd>
           <dt><span class="ico">🎯</span>Verdict</dt>
-          <dd><span class="badge badge-good">GOOD</span> bright sun · <span class="badge badge-marginal">MARGINAL</span> usable but not great · <span class="badge badge-no">NO</span> too cloudy or dark.</dd>
+          <dd><span class="badge badge-good">GOOD</span> bright sun · <span class="badge badge-marginal">MARGINAL</span> usable but not great · <span class="badge badge-no">NO</span> too cloudy or dark[cite: 6].</dd>
           <dt><span class="ico">📶</span>Confidence</dt>
-          <dd>How <strong>sure the model is</strong> about its verdict. <em>High</em> = very sure · <em>Medium</em> = fairly sure · <em>Low</em> = a toss-up.</dd>
+          <dd>How <strong>sure the model is</strong> about its verdict. <em>High</em> = very sure · <em>Medium</em> = fairly sure · <em>Low</em> = a toss-up[cite: 6].</dd>
         </dl>
       </div>
     </details>
@@ -77,6 +77,10 @@
         <label for="forecastDays">Days ahead <span class="info" tabindex="0" data-tip="How many days to look ahead. 1 = today only, 16 = the maximum forecast range.">i</span></label>
         <input id="forecastDays" type="number" step="1" min="1" max="16" value="7" />
       </div>
+      <div class="field">
+        <label for="mockNow">Test Time <span class="info" tabindex="0" data-tip="Optional: Pick a specific date & time to simulate 'now'. Leave blank to use live system time.">i</span></label>
+        <input id="mockNow" type="datetime-local" />
+      </div>
       <button id="analyzeBtn" class="btn">
         <span class="btn-icon">⚡</span>
         <span>Decide</span>
@@ -86,8 +90,8 @@
     <p id="status" class="status"></p>
 
     <div id="modelWarning" class="banner hidden">
-      ⚠️ <code>solar_model.pkl</code> not found — running on the fallback heuristic.
-      Run <code>train_model.ipynb</code> and restart the server to use the learned model.
+      ⚠️ <code>solar_model.pkl</code> not found — running on the fallback heuristic[cite: 1].
+      Run <code>train_model.ipynb</code> and restart the server to use the learned model[cite: 1, 2].
     </div>
 
     <section id="results" class="results hidden">
@@ -130,11 +134,11 @@
   <footer>
     <p><strong>How it works:</strong> we pull the hourly weather forecast from
       <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>, then a small
-      logistic-regression model predicts three probabilities for each hour —
+      logistic-regression model predicts three probabilities for each hour[cite: 1] —
       <span class="badge badge-good">GOOD</span>,
       <span class="badge badge-marginal">MARGINAL</span>,
-      <span class="badge badge-no">NO</span>.
-      Those combine into a <strong>utility score</strong> (0–1). The tool then compares three options —
+      <span class="badge badge-no">NO</span>[cite: 6].
+      Those combine into a <strong>utility score</strong> (0–1)[cite: 6]. The tool then compares three options —
       <em>run now</em>, <em>wait for a future hour</em>, or <em>skip</em> — and picks whichever scores highest.</p>
     <p><em>This is a simple forecast-based awareness tool. It is not a measurement, savings guarantee, or engineering advice.</em></p>
   </footer>

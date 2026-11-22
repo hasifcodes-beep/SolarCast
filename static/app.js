@@ -4,6 +4,7 @@
   const $ = (id) => document.getElementById(id);
   const els = {
     lat: $("lat"), lon: $("lon"), forecastDays: $("forecastDays"),
+    mockNow: $("mockNow"),
     locationPreset: $("locationPreset"),
     analyzeBtn: $("analyzeBtn"), status: $("status"), results: $("results"),
     modelWarning: $("modelWarning"),
@@ -64,10 +65,12 @@
 
   // ─── Fetch ──────────────────────────────────────────
   async function analyze() {
+    const mockVal = els.mockNow.value;
     const body = {
       latitude: parseFloat(els.lat.value),
       longitude: parseFloat(els.lon.value),
       forecast_days: parseInt(els.forecastDays.value, 10),
+      mock_now: mockVal ? mockVal + ":00" : null,
     };
     if (!Number.isFinite(body.latitude) ||
         !Number.isFinite(body.longitude) ||
@@ -434,7 +437,7 @@
       els.lat.value = preset.lat;
       els.lon.value = preset.lon;
       state.locationLabel = preset.label;
-      analyze(); // auto-refresh when the user picks a preset
+      analyze();
     } else {
       state.locationLabel = "Custom coordinates";
       els.lat.focus();
@@ -448,7 +451,7 @@
 
   // ─── Events ─────────────────────────────────────────
   els.analyzeBtn.addEventListener("click", analyze);
-  [els.lat, els.lon, els.forecastDays].forEach((inp) => {
+  [els.lat, els.lon, els.forecastDays, els.mockNow].forEach((inp) => {
     inp.addEventListener("keydown", (e) => {
       if (e.key === "Enter") { e.preventDefault(); analyze(); }
     });
@@ -457,7 +460,6 @@
     if (state.data) renderTable(state.data);
   });
 
-  // Initialize the label to match whatever's in the lat/lon boxes.
   syncPresetFromCoords();
   analyze();
 })();
