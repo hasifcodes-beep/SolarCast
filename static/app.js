@@ -147,7 +147,7 @@
       },
       wait_until_best: {
         icon: "⏳",
-        title: "WAIT — BEST HOUR AHEAD",
+        title: "WAIT UNTIL BEST — BEST HOUR AHEAD",
         detail: `A future hour beats running now. Utility <strong>${fmtNum(d.utility, 3)}</strong> ` +
                 `at <strong>${fmtTime(d.hour_time)}</strong>.`,
         plain: "Conditions will improve later. Hold off for now, then run your equipment at the " +
